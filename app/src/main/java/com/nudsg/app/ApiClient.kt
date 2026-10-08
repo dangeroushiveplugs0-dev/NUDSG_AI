@@ -57,6 +57,26 @@ class ApiClient {
         }
     }
 
+    fun testConnection(baseUrl: String, onSuccess: () -> Unit, onError: (Throwable) -> Unit) {
+        executor.execute {
+            var connection: HttpURLConnection? = null
+            try {
+                connection = (URL(baseUrl.trimEnd('/') + "/api/tags").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 3000
+                    readTimeout = 3000
+                }
+                if (connection.responseCode !in 200..299) throw IllegalStateException("Local AI returned HTTP " + connection.responseCode)
+                connection.inputStream.close()
+                onSuccess()
+            } catch (t: Throwable) {
+                onError(t)
+            } finally {
+                connection?.disconnect()
+            }
+        }
+    }
+
     fun friendlyError(error: Throwable, baseUrl: String): String {
         val message = error.message.orEmpty()
         return if (message.contains("failed to connect", true) || message.contains("Connection refused", true)) {

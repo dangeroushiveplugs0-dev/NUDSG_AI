@@ -188,6 +188,7 @@ class MainActivity : Activity() {
  }
  private fun openOlmoCatalog(){startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(ModelManager.OLMO_2_1B_BASE.sourceUrl)))}
  private fun chooseModelFile(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("application/octet-stream","application/x-gguf"))},2001)}
+ private fun testLocalConnection(){api.testConnection("http://127.0.0.1:11434",{runOnUiThread{showSimplePluginInfo("Local AI","Connection successful. The embedded Ollama-compatible server is listening on 127.0.0.1:11434.")}},{e->runOnUiThread{showSimplePluginInfo("Local AI","Not ready: "+api.friendlyError(e,"http://127.0.0.1:11434"))}})}
  private fun showPluginsDialog(){
   val items=arrayOf("GitHub — connect account / token","Google Drive — OAuth connector","Web Links — fetch page context","Image Vision — local model images")
   AlertDialog.Builder(this).setTitle("NudSG Plugins").setItems(items){_,w->when(w){0->showGitHubPluginDialog();1->showSimplePluginInfo("Google Drive","The Drive connector will use OAuth and only access files you authorize.");2->showSimplePluginInfo("Web Links","The web connector will fetch a URL and provide readable page context to the model.");3->showSimplePluginInfo("Image Vision","Images are stored locally and sent as Ollama-compatible image inputs when supported.")}}.setPositiveButton("Done",null).show()

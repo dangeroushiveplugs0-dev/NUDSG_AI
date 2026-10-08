@@ -63,7 +63,13 @@ class MainActivity : Activity() {
   send=Button(this).apply{text="Send";textSize=14f;setTextColor(Color.WHITE);background=rounded(Color.rgb(112,96,220),22);setOnClickListener{sendMessage()}}
   row.addView(input,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(6)});row.addView(attach,LinearLayout.LayoutParams(dp(52),dp(48)).apply{marginEnd=dp(6)});row.addView(send,LinearLayout.LayoutParams(dp(78),dp(48)})
   composer.addView(row);root.addView(composer,LinearLayout.LayoutParams(-1,-2));setContentView(root)
-  ViewCompat.setOnApplyWindowInsetsListener(root){v,i->val b=i.getInsets(WindowInsetsCompat.Type.systemBars());val k=i.getInsets(WindowInsetsCompat.Type.ime());v.setPadding(0,0,0,maxOf(b.bottom,k.bottom));scrollToBottomSoon();i}
+  ViewCompat.setOnApplyWindowInsetsListener(root) { v, i ->
+   val b = i.getInsets(WindowInsetsCompat.Type.systemBars())
+   val k = i.getInsets(WindowInsetsCompat.Type.ime())
+   v.setPadding(0, 0, 0, maxOf(b.bottom, k.bottom))
+   scrollToBottomSoon()
+   i
+  }
   ViewCompat.requestApplyInsets(root)
  }
  private fun openInitialChat(){val chats=store.listChats();if(chats.isEmpty())createNewChat(false) else loadChat(chats.first().id)}

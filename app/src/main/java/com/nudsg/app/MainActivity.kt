@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
         }
         input = EditText(this).apply {
             hint = "Message your local AI…"
-            hintTextColor = Color.rgb(145, 148, 160)
+            setHintTextColor(Color.rgb(145, 148, 160))
             setTextColor(Color.WHITE)
             textSize = 16f
             maxLines = 4

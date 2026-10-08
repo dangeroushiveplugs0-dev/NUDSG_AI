@@ -28,6 +28,7 @@ class MainActivity : Activity() {
  private lateinit var send:Button
  private lateinit var attachmentStrip:LinearLayout
  private val api=ApiClient()
+ private lateinit var localServer: LocalAiServer
  private lateinit var store:ChatStore
  private val pendingAttachments=mutableListOf<PendingAttachment>()
  private val prefs by lazy{getSharedPreferences("nudsg",MODE_PRIVATE)}
@@ -40,7 +41,7 @@ class MainActivity : Activity() {
  override fun onCreate(state:Bundle?){
   super.onCreate(state);WindowCompat.setDecorFitsSystemWindows(window,true)
   window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-  store=ChatStore(this);buildUi();openInitialChat()
+  store=ChatStore(this);localServer=LocalAiServer(this);localServer.startIfModelAvailable();buildUi();openInitialChat()
  }
  private fun buildUi(){
   val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.rgb(16,17,22))}
@@ -48,7 +49,7 @@ class MainActivity : Activity() {
   val menu=TextView(this).apply{text="☰";textSize=25f;setTextColor(Color.WHITE);gravity=Gravity.CENTER;setPadding(dp(10),dp(5),dp(10),dp(5));setOnClickListener{showChatList()}}
   val title=TextView(this).apply{text="NudSG";textSize=21f;setTextColor(Color.WHITE);typeface=Typeface.DEFAULT_BOLD}
   val newChat=TextView(this).apply{text="＋";textSize=25f;setTextColor(Color.WHITE);gravity=Gravity.CENTER;setPadding(dp(10),dp(4),dp(10),dp(4));setOnClickListener{createNewChat()}}
-  bar.addView(menu);bar.addView(title,LinearLayout.LayoutParams(0,-2,1f));bar.addView(newChat);bar.addView(smallButton("API"){showEndpointDialog()})
+  bar.addView(menu);bar.addView(title,LinearLayout.LayoutParams(0,-2,1f));bar.addView(newChat);bar.addView(smallButton("AI"){showLocalAiDialog()});bar.addView(smallButton("API"){showEndpointDialog()})
   bar.addView(smallButton("Plugins"){showPluginsDialog()},LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(5)})
   root.addView(bar)
   scroll=ScrollView(this).apply{isFillViewport=true;clipToPadding=false}
@@ -115,7 +116,7 @@ class MainActivity : Activity() {
  private fun fileToBase64(path:String):String?=try{android.util.Base64.encodeToString(File(path).readBytes(),android.util.Base64.NO_WRAP)}catch(_:Throwable){null}
  private fun chooseAttachment(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true)},1001)}
  @Deprecated("Android activity result API")
- override fun onActivityResult(req:Int,res:Int,data:Intent?){super.onActivityResult(req,res,data);if(req!=1001||res!=RESULT_OK||data==null)return;val uris=mutableListOf<Uri>();data.clipData?.let{for(i in 0 until it.itemCount)uris.add(it.getItemAt(i).uri)}?:data.data?.let{uris.add(it)};uris.forEach{copyAttachment(it)?.let{a->pendingAttachments.add(a)}};refreshAttachmentStrip()}
+ override fun onActivityResult(req:Int,res:Int,data:Intent?){super.onActivityResult(req,res,data);if(req==2001&&res==RESULT_OK&&data?.data!=null){try{contentResolver.openInputStream(data.data!!)?.use{input->val name=(data.data!!.lastPathSegment?:"nudsg-model").substringAfterLast("/");val safe=name.replace("[^A-Za-z0-9._-]".toRegex(),"_");val target=File(filesDir,if(safe.endsWith(".gguf",true))safe else "$safe.gguf");target.outputStream().use{out->input.copyTo(out)};localServer.stop();localServer.startIfModelAvailable();showLocalAiDialog()}}catch(e:Throwable){showSimplePluginInfo("Model import","Could not import the model: ${e.message}")};return};if(req!=1001||res!=RESULT_OK||data==null)return;val uris=mutableListOf<Uri>();data.clipData?.let{for(i in 0 until it.itemCount)uris.add(it.getItemAt(i).uri)}?:data.data?.let{uris.add(it)};uris.forEach{copyAttachment(it)?.let{a->pendingAttachments.add(a)}};refreshAttachmentStrip()}
  private fun copyAttachment(uri:Uri):PendingAttachment?=try{
   val mime=contentResolver.getType(uri).orEmpty().ifBlank{"application/octet-stream"};val name=queryDisplayName(uri)?:uri.lastPathSegment?:"attachment";val size=querySize(uri)
   val dir=File(filesDir,"attachments").apply{mkdirs()};val out=File(dir,UUID.randomUUID().toString()+"_"+name.replace("[^A-Za-z0-9._-]".toRegex(),"_"))
@@ -145,6 +146,14 @@ class MainActivity : Activity() {
   val bubble=TextView(this).apply{this.text=if(status=="FAILED"&&text.isBlank())"⚠ Generation failed" else text;textSize=16f;setTextColor(Color.WHITE);setPadding(dp(15),dp(11),dp(15),dp(11));background=rounded(Color.rgb(31,33,41),20)}
   wrap.addView(bubble,LinearLayout.LayoutParams((resources.displayMetrics.widthPixels*.82f).toInt(),-2));messagesLayout.addView(wrap);return bubble
  }
+ private fun showLocalAiDialog(){
+  val model=findLocalModel()
+  val status=if(model!=null) "Local runtime: ${if(localServer.startIfModelAvailable()) "READY" else "FAILED"}\nModel: ${model.name}\nSize: ${formatSize(model.length())}" else "Local runtime: NOT READY\nNo GGUF model is installed on this phone."
+  AlertDialog.Builder(this).setTitle("Local AI runtime").setMessage(status).setNeutralButton("Install GGUF"){_,_->chooseModelFile()}.setPositiveButton("Test connection"){_,_->testLocalConnection()}.setNegativeButton("Close",null).show()
+ }
+ private fun findLocalModel():File?=filesDir.listFiles()?.firstOrNull{it.isFile&&it.name.endsWith(".gguf",true)}
+ private fun chooseModelFile(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream"},2001)}
+ private fun testLocalConnection(){api.testConnection("http://127.0.0.1:11434",{runOnUiThread{showSimplePluginInfo("Local AI","Connection successful. The embedded Ollama-compatible server is listening on 127.0.0.1:11434.")}},{e->runOnUiThread{showSimplePluginInfo("Local AI","Not ready: "+api.friendlyError(e,"http://127.0.0.1:11434"))}})}
  private fun showPluginsDialog(){
   val items=arrayOf("GitHub — connect account / token","Google Drive — OAuth connector","Web Links — fetch page context","Image Vision — local model images")
   AlertDialog.Builder(this).setTitle("NudSG Plugins").setItems(items){_,w->when(w){0->showGitHubPluginDialog();1->showSimplePluginInfo("Google Drive","The Drive connector will use OAuth and only access files you authorize.");2->showSimplePluginInfo("Web Links","The web connector will fetch a URL and provide readable page context to the model.");3->showSimplePluginInfo("Image Vision","Images are stored locally and sent as Ollama-compatible image inputs when supported.")}}.setPositiveButton("Done",null).show()
@@ -169,5 +178,5 @@ class MainActivity : Activity() {
  private fun scrollToBottomSoon(){scroll.postDelayed({scroll.fullScroll(View.FOCUS_DOWN)},80)}
  private fun rounded(c:Int,r:Int)=GradientDrawable().apply{setColor(c);cornerRadius=dp(r).toFloat()}
  private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
- override fun onDestroy(){api.shutdown();store.closeStore();super.onDestroy()}
+ override fun onDestroy(){api.shutdown();localServer.stop();store.closeStore();super.onDestroy()}
 }

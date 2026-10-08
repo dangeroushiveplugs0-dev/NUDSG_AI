@@ -131,7 +131,13 @@ class MainActivity : Activity() {
    }catch(e:Throwable){showSimplePluginInfo("Model import","Could not import the model: ${e.message}")}
    return
   }
-  if(req!=1001||res!=RESULT_OK||data==null)return;
+  if(req!=1001||res!=RESULT_OK||data==null)return
+  val uris=mutableListOf<Uri>()
+  data.clipData?.let{for(i in 0 until it.itemCount)uris.add(it.getItemAt(i).uri)}
+    ?:data.data?.let{uris.add(it)}
+  uris.forEach{copyAttachment(it)?.let{a->pendingAttachments.add(a)}}
+  refreshAttachmentStrip()
+ }
  private fun copyAttachment(uri:Uri):PendingAttachment?=try{
   val mime=contentResolver.getType(uri).orEmpty().ifBlank{"application/octet-stream"};val name=queryDisplayName(uri)?:uri.lastPathSegment?:"attachment";val size=querySize(uri)
   val dir=File(filesDir,"attachments").apply{mkdirs()};val out=File(dir,UUID.randomUUID().toString()+"_"+name.replace("[^A-Za-z0-9._-]".toRegex(),"_"))

@@ -136,7 +136,7 @@ class MainActivity : Activity() {
   val wrap=LinearLayout(this).apply{gravity=Gravity.END;setPadding(0,dp(5),0,dp(5))}
   val bubble=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(10),dp(10),dp(10));background=rounded(Color.rgb(76,67,139),20)}
   val imgs=atts.filter{it.mime.startsWith("image/")};if(imgs.isNotEmpty()){val row=LinearLayout(this);imgs.forEach{a->row.addView(ImageView(this).apply{setImageBitmap(BitmapFactory.decodeFile(a.localPath));scaleType=ImageView.ScaleType.CENTER_CROP},LinearLayout.LayoutParams(dp(120),dp(120)).apply{marginEnd=dp(6)})};bubble.addView(row)}
-  atts.filter{!it.mime.startsWith("image/")}.forEach{a->bubble.addView(TextView(this).apply{text=fileEmoji(a.mime)+"  "+a.name+"\n"+formatSize(a.size);textSize=13f;setTextColor(Color.WHITE);setPadding(dp(9),dp(7),dp(9),dp(7));background=rounded(Color.argb(45,255,255,255),10)})}
+  atts.filter{!it.mime.startsWith("image/")}.forEach{a->bubble.addView(TextView(this).apply{this.text=fileEmoji(a.mime)+"  "+a.name+"\n"+formatSize(a.size);textSize=13f;setTextColor(Color.WHITE);setPadding(dp(9),dp(7),dp(9),dp(7));background=rounded(Color.argb(45,255,255,255),10)})}
   if(text.isNotBlank())bubble.addView(TextView(this).apply{this.text=text;textSize=16f;setTextColor(Color.WHITE);setPadding(dp(5),dp(7),dp(5),dp(2))})
   wrap.addView(bubble,LinearLayout.LayoutParams((resources.displayMetrics.widthPixels*.82f).toInt(),-2));messagesLayout.addView(wrap)
  }

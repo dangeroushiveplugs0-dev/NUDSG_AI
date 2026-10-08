@@ -26,6 +26,7 @@ class ChatStore(context: Context) : SQLiteOpenHelper(context, "nudsg_chats.db", 
         buildList { while (c.moveToNext()) add(SavedChat(c.getLong(0), c.getString(1), c.getLong(2), c.getLong(3))) }
     }
     fun touchChat(id: Long) = writableDatabase.execSQL("UPDATE chats SET last_used_at=? WHERE id=?", arrayOf(System.currentTimeMillis(), id))
+    fun renameChat(id: Long, title: String) = writableDatabase.execSQL("UPDATE chats SET title=? WHERE id=?", arrayOf(title.take(80), id))
     fun addMessage(chatId: Long, role: String, content: String, status: String): Long {
         val id = writableDatabase.insert("messages", null, ContentValues().apply { put("chat_id",chatId); put("role",role); put("content",content); put("status",status); put("created_at",System.currentTimeMillis()) })
         touchChat(chatId); return id

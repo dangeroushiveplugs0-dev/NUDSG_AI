@@ -61,7 +61,7 @@ class MainActivity : Activity() {
   input=EditText(this).apply{hint="Message your local AI…";setHintTextColor(Color.rgb(145,148,160));setTextColor(Color.WHITE);textSize=16f;maxLines=4;setPadding(dp(16),dp(11),dp(16),dp(11));background=rounded(Color.rgb(31,33,41),24);setOnFocusChangeListener{_,f->if(f)scrollToBottomSoon()}}
   val attach=Button(this).apply{text="＋";textSize=22f;setTextColor(Color.WHITE);background=rounded(Color.rgb(38,40,50),22);setOnClickListener{chooseAttachment()}}
   send=Button(this).apply{text="Send";textSize=14f;setTextColor(Color.WHITE);background=rounded(Color.rgb(112,96,220),22);setOnClickListener{sendMessage()}}
-  row.addView(input,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(6)});row.addView(attach,LinearLayout.LayoutParams(dp(52),dp(48)).apply{marginEnd=dp(6)});row.addView(send,LinearLayout.LayoutParams(dp(78),dp(48)})
+  row.addView(input,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(6)});row.addView(attach,LinearLayout.LayoutParams(dp(52),dp(48)).apply{marginEnd=dp(6)});row.addView(send,LinearLayout.LayoutParams(dp(78),dp(48)))
   composer.addView(row);root.addView(composer,LinearLayout.LayoutParams(-1,-2));setContentView(root)
   ViewCompat.setOnApplyWindowInsetsListener(root) { v, i ->
    val b = i.getInsets(WindowInsetsCompat.Type.systemBars())

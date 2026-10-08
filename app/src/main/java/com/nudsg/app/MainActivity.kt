@@ -8,9 +8,9 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
+import android.app.Activity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
     private lateinit var messagesLayout: LinearLayout
     private lateinit var input: EditText
     private lateinit var send: Button

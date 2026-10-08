@@ -1,5 +1,7 @@
 package com.nudsg.app
 
+data class PendingAttachment(val name: String, val mime: String, val size: Long, val base64Image: String? = null)
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.graphics.BitmapFactory

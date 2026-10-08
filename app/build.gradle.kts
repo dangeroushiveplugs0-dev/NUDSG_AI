@@ -20,5 +20,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
 }

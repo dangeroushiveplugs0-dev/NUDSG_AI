@@ -5,6 +5,7 @@ import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import dev.ffmpegkit.llama.Llama
 import dev.ffmpegkit.llama.LlamaConfig
+import dev.ffmpegkit.llama.LlamaModel
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -19,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * into the app's private models directory.
  */
 class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434) {
-    private var modelHandle: Any? = null
+    private var modelHandle: LlamaModel? = null
     private var loadedPath: String? = null
     private val running = AtomicBoolean(false)
 

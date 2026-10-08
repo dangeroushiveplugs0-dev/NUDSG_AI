@@ -13,21 +13,23 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Lightweight Ollama-compatible bridge.
+ * Lightweight Ollama-compatible bridge running entirely on the Android device.
  *
- * NudSG remains the UI/client, while this process provides localhost:11434.
- * The GGUF weights are never bundled in the APK; the user imports a model
- * into the app's private models directory.
+ * The selected GGUF is kept in the app-private files directory. Multiple GGUFs
+ * may be installed; ModelManager decides which one is active.
  */
 class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434) {
+    private val models = ModelManager(context)
     private var modelHandle: LlamaModel? = null
     private var loadedPath: String? = null
     private val running = AtomicBoolean(false)
 
     fun startIfModelAvailable(): Boolean {
-        val model = findLocalModel() ?: return false
-        if (running.get()) return true
+        val model = models.selectedModel()?.file ?: return false
+        if (running.get() && loadedPath == model.absolutePath && modelHandle != null) return true
         return try {
+            if (running.get()) super.stop()
+            running.set(false)
             loadModel(model)
             start(SOCKET_READ_TIMEOUT, false)
             running.set(true)
@@ -38,17 +40,21 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
         }
     }
 
-    private fun findLocalModel(): File? = context.filesDir.listFiles()?.firstOrNull { it.isFile && it.name.endsWith(".gguf", true) }
+    fun reloadSelectedModel(): Boolean {
+        stop()
+        return startIfModelAvailable()
+    }
 
     private fun loadModel(file: File) {
         if (loadedPath == file.absolutePath && modelHandle != null) return
-        if (modelHandle != null) {
-            try { Llama.releaseModel(modelHandle!!) } catch (_: Throwable) {}
-        }
+        modelHandle?.let { try { Llama.releaseModel(it) } catch (_: Throwable) {} }
         modelHandle = runBlocking {
             Llama.loadModel(
                 modelPath = file.absolutePath,
-                config = LlamaConfig(contextSize = 4096, threads = maxOf(2, Runtime.getRuntime().availableProcessors() - 1))
+                config = LlamaConfig(
+                    contextSize = 4096,
+                    threads = maxOf(2, Runtime.getRuntime().availableProcessors() - 1)
+                )
             )
         }
         loadedPath = file.absolutePath
@@ -58,9 +64,16 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
         return try {
             when {
                 session.method == Method.GET && session.uri == "/api/tags" -> {
-                    val model = findLocalModel()
+                    val installed = models.installedModels()
                     json(Response.Status.OK, JSONObject().put("models", JSONArray().apply {
-                        if (model != null) put(JSONObject().put("name", "llama3.2").put("path", model.name))
+                        installed.forEach { item ->
+                            put(JSONObject()
+                                .put("name", item.modelId)
+                                .put("display_name", item.displayName)
+                                .put("path", item.file.name)
+                                .put("size", item.file.length())
+                                .put("selected", item.isSelected))
+                        }
                     }))
                 }
                 session.method == Method.POST && session.uri == "/api/chat" -> chat(session)
@@ -68,7 +81,10 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
             }
         } catch (t: Throwable) {
             Log.e("NudSG", "Local API error", t)
-            json(Response.Status.INTERNAL_ERROR, JSONObject().put("error", t.message ?: "Local inference failed"))
+            json(
+                Response.Status.INTERNAL_ERROR,
+                JSONObject().put("error", t.message ?: "Local inference failed")
+            )
         }
     }
 
@@ -79,6 +95,8 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
         val messages = request.optJSONArray("messages") ?: JSONArray()
         val prompt = buildPrompt(messages)
         val model = modelHandle ?: throw IllegalStateException("No GGUF model is installed")
+        val started = System.nanoTime()
+
         val result = runBlocking {
             Llama.complete(
                 model,
@@ -87,10 +105,14 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
                 maxTokens = request.optInt("num_predict", 512)
             )
         }
+
+        val elapsedSeconds = (System.nanoTime() - started) / 1_000_000_000.0
         val response = JSONObject()
-            .put("model", request.optString("model", "llama3.2"))
+            .put("model", models.selectedModel()?.modelId ?: request.optString("model", "local"))
             .put("message", JSONObject().put("role", "assistant").put("content", result.text))
             .put("done", true)
+            .put("elapsed_seconds", elapsedSeconds)
+            .put("tokens_per_second", result.tokensPerSecond)
         return json(Response.Status.OK, response)
     }
 
@@ -100,7 +122,10 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
             val m = messages.optJSONObject(i) ?: continue
             val role = m.optString("role", "user")
             val content = m.optString("content", "")
-            out.append(role.replaceFirstChar { it.uppercase() }).append(": ").append(content).append("\n")
+            out.append(role.replaceFirstChar { it.uppercase() })
+                .append(": ")
+                .append(content)
+                .append("\n")
         }
         out.append("Assistant:")
         return out.toString()

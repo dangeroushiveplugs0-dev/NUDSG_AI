@@ -2,7 +2,6 @@ package com.nudsg.app
 
 import org.json.JSONArray
 import org.json.JSONObject
-import android.util.Base64
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
@@ -31,7 +30,11 @@ class ApiClient {
                 }
                 val jsonMessages = JSONArray()
                 messages.forEach {
-                    jsonMessages.put(JSONObject().apply { put("role", it.role); put("content", it.content); if (it.images.isNotEmpty()) put("images", JSONArray(it.images)) })
+                    jsonMessages.put(JSONObject().apply {
+                        put("role", it.role)
+                        put("content", it.content)
+                        if (it.images.isNotEmpty()) put("images", JSONArray(it.images))
+                    })
                 }
                 val payload = JSONObject().put("model", model).put("messages", jsonMessages).put("stream", true)
                 connection.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
@@ -52,6 +55,13 @@ class ApiClient {
                 connection?.disconnect()
             }
         }
+    }
+
+    fun friendlyError(error: Throwable, baseUrl: String): String {
+        val message = error.message.orEmpty()
+        return if (message.contains("failed to connect", true) || message.contains("Connection refused", true)) {
+            "Could not reach $baseUrl. 127.0.0.1 is the phone itself, so the Ollama-compatible server must actually be running on this phone at port 11434."
+        } else message.ifBlank { error.javaClass.simpleName }
     }
 
     fun shutdown() = executor.shutdownNow()

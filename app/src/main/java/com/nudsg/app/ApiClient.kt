@@ -2,6 +2,7 @@ package com.nudsg.app
 
 import org.json.JSONArray
 import org.json.JSONObject
+import android.util.Base64
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
@@ -9,7 +10,7 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
-data class ChatMessage(val role: String, val content: String)
+data class ChatMessage(val role: String, val content: String, val images: List<String> = emptyList())
 
 class ApiClient {
     private val executor = Executors.newCachedThreadPool()
@@ -30,7 +31,7 @@ class ApiClient {
                 }
                 val jsonMessages = JSONArray()
                 messages.forEach {
-                    jsonMessages.put(JSONObject().put("role", it.role).put("content", it.content))
+                    jsonMessages.put(JSONObject().apply { put("role", it.role); put("content", it.content); if (it.images.isNotEmpty()) put("images", JSONArray(it.images)) })
                 }
                 val payload = JSONObject().put("model", model).put("messages", jsonMessages).put("stream", true)
                 connection.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }

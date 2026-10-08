@@ -24,7 +24,7 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
     private val running = AtomicBoolean(false)
 
     fun startIfModelAvailable(): Boolean {
-        val model = ModelStore(context).modelFile() ?: return false
+        val model = findLocalModel() ?: return false
         if (running.get()) return true
         return try {
             loadModel(model)
@@ -36,6 +36,8 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
             false
         }
     }
+
+    private fun findLocalModel(): File? = context.filesDir.listFiles()?.firstOrNull { it.isFile && it.name.endsWith(".gguf", true) }
 
     private fun loadModel(file: File) {
         if (loadedPath == file.absolutePath && modelHandle != null) return
@@ -55,7 +57,7 @@ class LocalAiServer(private val context: Context) : NanoHTTPD("127.0.0.1", 11434
         return try {
             when {
                 session.method == Method.GET && session.uri == "/api/tags" -> {
-                    val model = ModelStore(context).modelFile()
+                    val model = findLocalModel()
                     json(Response.Status.OK, JSONObject().put("models", JSONArray().apply {
                         if (model != null) put(JSONObject().put("name", "llama3.2").put("path", model.name))
                     }))

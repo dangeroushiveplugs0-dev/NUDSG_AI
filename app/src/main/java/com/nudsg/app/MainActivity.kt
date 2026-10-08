@@ -5,6 +5,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
+import android.util.Base64
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -16,6 +19,7 @@ class MainActivity : Activity() {
     private lateinit var send: Button
     private val api = ApiClient()
     private val messages = mutableListOf<ChatMessage>()
+    private val pendingImages = mutableListOf<Pair<String, String>>()
     private val prefs by lazy { getSharedPreferences("nudsg", MODE_PRIVATE) }
 
     private var endpoint: String
@@ -56,6 +60,16 @@ class MainActivity : Activity() {
         }
         toolbar.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
         toolbar.addView(endpointButton)
+        val pluginsButton = TextView(this).apply {
+            text = "  Plugins  "
+            textSize = 12f
+            setTextColor(Color.LTGRAY)
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(7), dp(8), dp(7))
+            background = rounded(Color.rgb(38, 40, 50), 18)
+            setOnClickListener { showPluginsDialog() }
+        }
+        toolbar.addView(pluginsButton, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(6) })
         root.addView(toolbar)
 
         messagesLayout = LinearLayout(this).apply {
@@ -78,6 +92,13 @@ class MainActivity : Activity() {
             setPadding(dp(16), dp(11), dp(16), dp(11))
             background = rounded(Color.rgb(31, 33, 41), 24)
         }
+        val attach = Button(this).apply {
+            text = "＋"
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            background = rounded(Color.rgb(38, 40, 50), 22)
+            setOnClickListener { chooseAttachment() }
+        }
         send = Button(this).apply {
             text = "Send"
             textSize = 14f
@@ -85,7 +106,8 @@ class MainActivity : Activity() {
             background = rounded(Color.rgb(112, 96, 220), 22)
             setOnClickListener { sendMessage(scroll) }
         }
-        composer.addView(input, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
+        composer.addView(input, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(6) })
+        composer.addView(attach, LinearLayout.LayoutParams(dp(52), dp(48)).apply { marginEnd = dp(6) })
         composer.addView(send, LinearLayout.LayoutParams(dp(78), dp(48)))
         root.addView(composer)
         setContentView(root)
@@ -95,8 +117,12 @@ class MainActivity : Activity() {
         val text = input.text.toString().trim()
         if (text.isEmpty()) return
         input.setText("")
-        addBubble(text, true)
-        messages.add(ChatMessage("user", text))
+        val imagePayloads = pendingImages.map { it.second }
+        val attachmentNames = pendingImages.map { it.first }
+        val displayText = if (attachmentNames.isEmpty()) text else text + "\n📎 " + attachmentNames.joinToString(", ")
+        addBubble(displayText, true)
+        messages.add(ChatMessage("user", text, imagePayloads))
+        pendingImages.clear()
         val aiBubble = addBubble("", false)
         messages.add(ChatMessage("assistant", ""))
         send.isEnabled = false
@@ -115,6 +141,54 @@ class MainActivity : Activity() {
                     send.isEnabled = true
                 }
             })
+    }
+
+    private fun chooseAttachment() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        startActivityForResult(intent, 1001)
+    }
+
+    @Deprecated("Android activity result API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 1001 || resultCode != RESULT_OK || data == null) return
+        val uris = mutableListOf<Uri>()
+        data.clipData?.let { clip ->
+            for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
+        } ?: data.data?.let { uris.add(it) }
+        uris.forEach { uri ->
+            val mime = contentResolver.getType(uri).orEmpty()
+            if (mime.startsWith("image/")) {
+                try {
+                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@forEach
+                    val encoded = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    val name = uri.lastPathSegment ?: "image"
+                    pendingImages.add(name to encoded)
+                } catch (_: Throwable) { }
+            }
+        }
+        if (pendingImages.isNotEmpty()) {
+            input.hint = pendingImages.size.toString() + " image(s) attached — add a message"
+        }
+    }
+
+    private fun showPluginsDialog() {
+        val plugins = arrayOf(
+            "GitHub — planned OAuth connector",
+            "Google Drive — planned OAuth connector",
+            "Web Links — URL fetching connector",
+            "Image Vision — enabled for compatible models"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("NudSG Plugins")
+            .setItems(plugins, null)
+            .setMessage("Plugins will be isolated providers that can supply files, links, and context to the local AI. GitHub and Drive need their own OAuth authorization.")
+            .setPositiveButton("Done", null)
+            .show()
     }
 
     private fun addBubble(text: String, isUser: Boolean): TextView {
